@@ -97,21 +97,48 @@ refreshQuoteBtn.addEventListener('click', fetchQuote);
 // Ambil kutipan saat halaman pertama kali dimuat
 fetchQuote();
 
-// 4. Logika To-Do List (Local Storage)
+// 4. Logika To-Do List (Supabase Cloud Database)
+const SUPABASE_URL = 'https://efmuahycndthebsipgbt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmbXVhaHljbmR0aGVic2lwZ2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMzkxODIsImV4cCI6MjEwODkxNTE4Mn0.XaD7NNimWpV-k4lOvsNwPXGZZ5_l89ZdFlZpM1OvX0g';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const addBtn = document.getElementById('addBtn');
 const taskInput = document.getElementById('taskInput');
 const taskList = document.getElementById('taskList');
 
-let tasks = JSON.parse(localStorage.getItem('dashboard_tasks')) || [
-  { text: 'Merapikan kode HTML dasar', completed: true },
-  { text: 'Menyiapkan repositori Git', completed: false }
-];
+let tasks = [];
 
-function saveAndRender() {
-  localStorage.setItem('dashboard_tasks', JSON.stringify(tasks));
-  renderTasks();
+// Helper untuk mencegah injeksi HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
+// 1. Ambil daftar tugas dari tabel 'todos'
+async function loadTasks() {
+  taskList.innerHTML = '<li class="empty-state">Memuat tugas...</li>';
+
+  try {
+    const { data, error } = await supabase
+      .from('todos')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    tasks = data || [];
+    renderTasks();
+  } catch (error) {
+    console.error('Gagal memuat tugas dari Supabase:', error);
+    taskList.innerHTML = '<li class="empty-state">Gagal memuat tugas dari server.</li>';
+  }
+}
+
+// 2. Render tampilan daftar tugas
 function renderTasks() {
   taskList.innerHTML = '';
 
@@ -120,25 +147,41 @@ function renderTasks() {
     return;
   }
 
-  tasks.forEach((task, index) => {
+  tasks.forEach((task) => {
     const li = document.createElement('li');
-    if (task.completed) li.classList.add('completed');
+    if (task.is_completed) li.classList.add('completed');
 
     li.innerHTML = `
-      <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${index})">
-      <span>${task.text}</span>
-      <button class="btn-del" onclick="deleteTask(${index})" title="Hapus">✕</button>
+      <input type="checkbox" ${task.is_completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
+      <span>${escapeHtml(task.text)}</span>
+      <button class="btn-del" onclick="deleteTask(${task.id})" title="Hapus">✕</button>
     `;
     taskList.appendChild(li);
   });
 }
 
-addBtn.addEventListener('click', () => {
-  const text = taskInput.value.trim();
-  if (text !== '') {
-    tasks.push({ text: text, completed: false });
+// 3. Tambah tugas baru ke tabel 'todos'
+addBtn.addEventListener('click', async () => {
+  const taskText = taskInput.value.trim();
+  if (taskText === '') return;
+
+  addBtn.disabled = true;
+  try {
+    const { error } = await supabase
+      .from('todos')
+      .insert([{ text: taskText, is_completed: false }]);
+
+    if (error) {
+      throw error;
+    }
+
     taskInput.value = '';
-    saveAndRender();
+    await loadTasks();
+  } catch (error) {
+    console.error('Gagal menambahkan tugas:', error);
+    alert('Gagal menambahkan tugas: ' + error.message);
+  } finally {
+    addBtn.disabled = false;
   }
 });
 
@@ -146,14 +189,54 @@ taskInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') addBtn.click();
 });
 
-window.toggleTask = function(index) {
-  tasks[index].completed = !tasks[index].completed;
-  saveAndRender();
+// 4. Perbarui status selesai (is_completed)
+window.toggleTask = async function(id) {
+  const task = tasks.find((t) => t.id === id);
+  if (!task) return;
+
+  const updatedStatus = !task.is_completed;
+  task.is_completed = updatedStatus;
+  renderTasks(); // Optimistic update
+
+  try {
+    const { error } = await supabase
+      .from('todos')
+      .update({ is_completed: updatedStatus })
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error('Gagal memperbarui status tugas:', error);
+    // Kembalikan ke status semula jika gagal
+    task.is_completed = !updatedStatus;
+    renderTasks();
+  }
 };
 
-window.deleteTask = function(index) {
-  tasks.splice(index, 1);
-  saveAndRender();
+// 5. Hapus tugas dari tabel 'todos' berdasarkan id
+window.deleteTask = async function(id) {
+  const previousTasks = [...tasks];
+  tasks = tasks.filter((t) => t.id !== id);
+  renderTasks(); // Optimistic update
+
+  try {
+    const { error } = await supabase
+      .from('todos')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error('Gagal menghapus tugas:', error);
+    // Kembalikan daftar tugas jika gagal
+    tasks = previousTasks;
+    renderTasks();
+  }
 };
 
-renderTasks();
+// Muat data awal dari Supabase
+loadTasks();
