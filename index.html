@@ -97,6 +97,70 @@
       background-color: var(--border-color);
     }
 
+    /* Komponen Kutipan Inspirasi Harian */
+    .quote-card {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      background-color: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-left: 3px solid var(--accent);
+      border-radius: 10px;
+    }
+
+    .quote-content {
+      flex: 1;
+    }
+
+    .quote-text {
+      margin: 0;
+      font-size: 0.88rem;
+      font-style: italic;
+      line-height: 1.45;
+      color: var(--text-color);
+    }
+
+    .quote-author {
+      margin: 6px 0 0;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .btn-refresh-quote {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: color 0.2s ease, background-color 0.2s ease, transform 0.3s ease;
+    }
+
+    .btn-refresh-quote:hover {
+      color: var(--accent);
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    body.dark .btn-refresh-quote:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-refresh-quote svg {
+      transition: transform 0.35s ease;
+    }
+
+    .btn-refresh-quote.spin svg {
+      transform: rotate(360deg);
+    }
+
     .input-group {
       display: flex;
       gap: 8px;
@@ -207,6 +271,20 @@
       <button class="theme-toggle" id="themeBtn">🌓 Ganti Tema</button>
     </div>
 
+    <!-- Komponen Kutipan Inspirasi Harian -->
+    <div class="quote-card">
+      <div class="quote-content">
+        <p class="quote-text">“<span id="quoteText">Memuat kutipan...</span>”</p>
+        <p class="quote-author">— <span id="quoteAuthor">...</span></p>
+      </div>
+      <button class="btn-refresh-quote" id="refreshQuoteBtn" title="Ganti kutipan" aria-label="Ganti kutipan">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+      </button>
+    </div>
+
     <div class="input-group">
       <input type="text" id="taskInput" placeholder="Ketik tugas baru...">
       <button class="btn-add" id="addBtn">Tambah</button>
@@ -252,7 +330,64 @@
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
     });
 
-    // 3. Logika To-Do List (Local Storage)
+    // 3. Logika Kutipan Inspirasi Harian
+    const quotes = [
+      {
+        text: "Keberhasilan bukanlah milik orang pintar, tetapi milik mereka yang senantiasa berusaha.",
+        author: "B.J. Habibie"
+      },
+      {
+        text: "Bermimpilah setinggi langit. Jika engkau jatuh, engkau akan jatuh di antara bintang-bintang.",
+        author: "Ir. Soekarno"
+      },
+      {
+        text: "Jadikan setiap tempat sebagai sekolah dan jadikan setiap orang sebagai guru.",
+        author: "Ki Hajar Dewantara"
+      },
+      {
+        text: "Tiada awan di langit yang tetap selamanya. Sehabis malam gelap gulita, lahir pagi membawa keindahan.",
+        author: "R.A. Kartini"
+      },
+      {
+        text: "Hidup itu seperti sepeda. Agar tetap seimbang, kamu harus terus bergerak maju.",
+        author: "Albert Einstein"
+      },
+      {
+        text: "Kebaikan yang paling utama adalah saat kita mampu memberi manfaat bagi sesama.",
+        author: "Gus Dur"
+      }
+    ];
+
+    const quoteText = document.getElementById('quoteText');
+    const quoteAuthor = document.getElementById('quoteAuthor');
+    const refreshQuoteBtn = document.getElementById('refreshQuoteBtn');
+    let currentQuoteIndex = -1;
+
+    function displayRandomQuote() {
+      let randomIndex;
+      if (quotes.length > 1) {
+        do {
+          randomIndex = Math.floor(Math.random() * quotes.length);
+        } while (randomIndex === currentQuoteIndex);
+      } else {
+        randomIndex = 0;
+      }
+      currentQuoteIndex = randomIndex;
+      quoteText.textContent = quotes[randomIndex].text;
+      quoteAuthor.textContent = quotes[randomIndex].author;
+    }
+
+    refreshQuoteBtn.addEventListener('click', () => {
+      refreshQuoteBtn.classList.remove('spin');
+      void refreshQuoteBtn.offsetWidth; // Memicu reflow browser agar animasi putar bisa diulang
+      refreshQuoteBtn.classList.add('spin');
+      displayRandomQuote();
+    });
+
+    // Tampilkan kutipan acak saat halaman dimuat
+    displayRandomQuote();
+
+    // 4. Logika To-Do List (Local Storage)
     const addBtn = document.getElementById('addBtn');
     const taskInput = document.getElementById('taskInput');
     const taskList = document.getElementById('taskList');
