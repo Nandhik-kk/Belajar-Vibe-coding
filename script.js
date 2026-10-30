@@ -34,8 +34,13 @@ themeBtn.addEventListener('click', () => {
   localStorage.setItem('theme', isDark ? 'dark' : 'light');
 });
 
-// 3. Logika Kutipan Inspirasi Harian
-const quotes = [
+// 3. Logika Kutipan Inspirasi Harian (Fetch API Dinamis)
+const quoteText = document.getElementById('quoteText');
+const quoteAuthor = document.getElementById('quoteAuthor');
+const refreshQuoteBtn = document.getElementById('refreshQuoteBtn');
+
+// Kutipan cadangan (fallback) jika koneksi internet terputus atau API bermasalah
+const fallbackQuotes = [
   {
     text: "Keberhasilan bukanlah milik orang pintar, tetapi milik mereka yang senantiasa berusaha.",
     author: "B.J. Habibie"
@@ -47,49 +52,50 @@ const quotes = [
   {
     text: "Jadikan setiap tempat sebagai sekolah dan jadikan setiap orang sebagai guru.",
     author: "Ki Hajar Dewantara"
-  },
-  {
-    text: "Tiada awan di langit yang tetap selamanya. Sehabis malam gelap gulita, lahir pagi membawa keindahan.",
-    author: "R.A. Kartini"
-  },
-  {
-    text: "Hidup itu seperti sepeda. Agar tetap seimbang, kamu harus terus bergerak maju.",
-    author: "Albert Einstein"
-  },
-  {
-    text: "Kebaikan yang paling utama adalah saat kita mampu memberi manfaat bagi sesama.",
-    author: "Gus Dur"
   }
 ];
 
-const quoteText = document.getElementById('quoteText');
-const quoteAuthor = document.getElementById('quoteAuthor');
-const refreshQuoteBtn = document.getElementById('refreshQuoteBtn');
-let currentQuoteIndex = -1;
+async function fetchQuote() {
+  // Status pemuatan (loading state): beri teks sementara & nonaktifkan tombol
+  quoteText.textContent = "Mengambil inspirasi...";
+  quoteAuthor.textContent = "...";
+  refreshQuoteBtn.disabled = true;
+  refreshQuoteBtn.classList.add('spin');
 
-function displayRandomQuote() {
-  let randomIndex;
-  if (quotes.length > 1) {
-    do {
-      randomIndex = Math.floor(Math.random() * quotes.length);
-    } while (randomIndex === currentQuoteIndex);
-  } else {
-    randomIndex = 0;
+  try {
+    // Ambil kutipan dari API publik AdviceSlip dengan parameter acak/timestamp untuk mencegah cache browser
+    const response = await fetch(`https://api.adviceslip.com/advice?t=${Date.now()}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data && data.slip && data.slip.advice) {
+      quoteText.textContent = data.slip.advice;
+      quoteAuthor.textContent = `Advice Slip #${data.slip.id}`;
+    } else {
+      throw new Error("Format respon API tidak valid");
+    }
+  } catch (error) {
+    console.error("Gagal mengambil kutipan dari API:", error);
+    // Fallback sederhana saat offline atau terjadi galat
+    const randomFallback = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+    quoteText.textContent = randomFallback.text;
+    quoteAuthor.textContent = randomFallback.author;
+  } finally {
+    // Kembalikan status tombol ke keadaan aktif dan hentikan animasi putar
+    refreshQuoteBtn.disabled = false;
+    refreshQuoteBtn.classList.remove('spin');
   }
-  currentQuoteIndex = randomIndex;
-  quoteText.textContent = quotes[randomIndex].text;
-  quoteAuthor.textContent = quotes[randomIndex].author;
 }
 
-refreshQuoteBtn.addEventListener('click', () => {
-  refreshQuoteBtn.classList.remove('spin');
-  void refreshQuoteBtn.offsetWidth; // Memicu reflow browser agar animasi putar bisa diulang
-  refreshQuoteBtn.classList.add('spin');
-  displayRandomQuote();
-});
+// Hubungkan tombol refresh kutipan ke fungsi fetchQuote
+refreshQuoteBtn.addEventListener('click', fetchQuote);
 
-// Tampilkan kutipan acak saat halaman dimuat
-displayRandomQuote();
+// Ambil kutipan saat halaman pertama kali dimuat
+fetchQuote();
 
 // 4. Logika To-Do List (Local Storage)
 const addBtn = document.getElementById('addBtn');
